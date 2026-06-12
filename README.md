@@ -1,40 +1,68 @@
-Smarts — Technical README
+Smarts (Chat Message POE)
 
-Project snapshot
-----------------
-- Name: Smarts
-- Language: Java (source compiled with javac; project configured for Java 21 in NetBeans metadata)
-- Project type: small educational/POE assignment implementing a simple message manager with in-memory collections, file persistence and reporting
+Smarts is a small Java assignment that implements a basic message manager (send/store/disregard) with simple persistence and reporting. The project includes unit tests that verify behavior and an automated CI workflow that runs the test suite.
 
-Repository layout (important files)
-----------------------------------
-- src/mainApp/
-  - `Message.java`   — Core domain class: message model, validation, in-memory collections, JSON persistence helpers, reporting and search/delete operations.
-  - `Login.java`     — Simple validation utilities used by tests (username/password/cell checks).
-  - `Main.java`      — Application entry/console driver (menu-driven behavior).
-- Test/
-  - `testApp/MessageTest.java` — JUnit tests for `Message` behaviour and persistence.
-  - `testApp/LoginTest.java`   — JUnit tests for `Login` validators.
-- nbproject/         — NetBeans project metadata; `nbproject/project.properties` references a test runtime JAR.
-- lib/               — (not committed by default) expected location for `junit-platform-console-standalone-1.10.2.jar` when running tests locally.
-- storedMessages.json — runtime file used to persist stored messages (created by the app when storing messages).
+This README provides a short developer quick-start, build/test commands, and example snippets so you can get started quickly.
 
-High-level behavior
--------------------
-- Messages contain: messageID (10 chars), messageNumber (int), recipient (string, expected in South African international format `+27xxxxxxxxx`), sender, messageText.
-- Validation performed: message ID length, recipient format, message length (<= 250).
-- Message hash generation: prefix of messageID + messageNumber + (first+last word or single word), cleaned of trailing punctuation.
-- Lifecycle operations via `sentMessage(int option)`:
-  - 1 => Sent (adds to sent array)
-  - 2 => Disregarded (adds to disregarded array)
-  - 3 => Stored (writes to JSON file and adds to stored array)
-- Persistence: stored messages are written to `storedMessages.json`. The application has helpers to read that file and load messages back into memory.
+---
 
-Data format (storedMessages.json)
+Quick summary
+-------------
+- Messages have: messageID (10 chars), messageNumber (int), recipient (expected `+27#########`), sender, and messageText.
+- Supported operations: Sent, Stored, Disregarded.
+- Stored messages are persisted as a JSON array in `storedMessages.json`.
+- Tests are under `Test/testApp` and validate the core behaviour.
+
+Project layout
+--------------
+- `src/mainApp/` — application sources (Message, Login, Main)
+- `Test/testApp/` — JUnit tests
+- `pom.xml` — Maven POM (manages Gson and JUnit)
+- `.github/workflows/test.yml` — GitHub Actions workflow (runs `mvn test`)
+
+What changed recently
+---------------------
+- Manual JSON handling replaced with Gson for robust serialization/deserialization.
+- Added `pom.xml` and updated CI to use Maven so dependencies are declared and managed.
+- Improved IO error handling and fixed duplicate search results.
+
+Quick-start (recommended: Maven)
 --------------------------------
-The project writes stored messages as a JSON array of objects. Each object contains these keys: `messageID`, `messageHash`, `sender`, `recipient`, `messageText`, `flag`.
+Prerequisite: Java 21 and Maven installed locally.
 
-Example element:
+1) Build and run tests with Maven (the `custom-src` profile maps the current layout):
+
+```bash
+mvn -Pcustom-src -B test
+```
+
+This will download dependencies (Gson, JUnit) automatically and run the unit test suite.
+
+Manual compile/run (alternative)
+--------------------------------
+If you do not have Maven, you can compile and run tests manually (Windows PowerShell example):
+
+```powershell
+# from project root
+mkdir -Force lib
+Invoke-WebRequest -Uri https://repo1.maven.org/maven2/org/junit/platform/junit-platform-console-standalone/1.10.2/junit-platform-console-standalone-1.10.2.jar -OutFile lib\junit-platform-console-standalone-1.10.2.jar
+# compile (Gson jar required on classpath if using Gson in code)
+javac -d build\classes -cp lib\gson-2.10.1.jar src\mainApp\*.java
+javac -cp "build\classes;lib\gson-2.10.1.jar;lib\junit-platform-console-standalone-1.10.2.jar" -d build\test\classes Test\testApp\*.java
+# run tests
+java -jar lib\junit-platform-console-standalone-1.10.2.jar --class-path "build\classes;build\test\classes;lib\gson-2.10.1.jar" --scan-class-path
+```
+
+Notes
+-----
+- Prefer Maven for reproducible builds and dependency management.
+- The `custom-src` Maven profile maps the repository's current NetBeans-style layout (`src/mainApp`, `Test/testApp`) so Maven can find sources and tests.
+
+Example stored message (what `storedMessages.json` contains)
+---------------------------------------------------------
+An element in the array looks like:
+
+```json
 {
   "messageID": "1111111111",
   "messageHash": "11:1:DIDYOU",
@@ -43,59 +71,16 @@ Example element:
   "messageText": "Did you get the cake?",
   "flag": "Stored"
 }
-
-Design notes & trade-offs
-------------------------
-- Manual JSON handling: The code builds and parses JSON strings by hand. This is simple for the assignment but brittle (escaping, formatting and edge cases). Consider using a solid JSON library (Gson/Jackson) for production/robustness.
-- Persistence strategy: The app rewrites the entire JSON file on each store/delete operation. That is acceptable for small data sets but inefficient for larger data.
-- Deduplication: The code previously returned duplicate search results when the same message appeared both in-memory and on-disk; this was fixed by deduplicating results in `searchByRecipient`.
-
-Build and test (developer instructions)
-# Smarts (Chat Message POE)
-
-Smarts is a small Java assignment that implements a basic message manager (send/store/disregard) with simple persistence and reporting. It was written as an educational project and includes unit tests that validate the required behaviors.
-
-## Key features
-- Create and validate messages (ID format, recipient format, length checks)
-- Mark messages as Sent, Stored, or Disregarded
-- Persist stored messages to `storedMessages.json` (JSON array)
-- Search and delete stored messages by message ID or message hash
-- Console reporting helpers to display stored messages
-
-## Project layout
-- `src/mainApp/` — application sources (`Message.java`, `Login.java`, `Main.java`)
-- `Test/testApp/` — JUnit tests (`MessageTest.java`, `LoginTest.java`)
-- `pom.xml` — Maven POM (added to manage Gson and JUnit dependencies)
-- `.github/workflows/test.yml` — GitHub Actions workflow (runs `mvn test`)
-
-## Build & test (recommended: Maven)
-This repository now includes a `pom.xml`. The GitHub CI workflow uses Maven to build and run tests.
-
-Locally, if you have Maven installed, run from the project root:
-```bash
-mvn -Pcustom-src -B test
 ```
 
-Notes:
-- The project uses a profile `custom-src` in `pom.xml` that maps the current source layout (`src/mainApp` and `Test/testApp`) so Maven can locate sources and tests.
+If CI fails
+-----------
+- Open the Actions page for the failing run and inspect the log. The updated workflow runs `mvn -Pcustom-src test` which should pass if `pom.xml` is present and correct.
+- Paste the failing log here if anything still fails and I will diagnose it immediately.
 
-If you don't have Maven installed, you can still compile and run tests using the provided JARs (not recommended long-term). See the `lib/README.md` for the JUnit runner download command.
+Contributing and next steps
+---------------------------
+- I can convert to Gradle if you prefer, or refactor the persistence layer into a separate class. Tell me which change you'd like next and I will implement and test it.
+- Add a `LICENSE` file before publishing if you want to pick a specific license.
 
-## Recent changes
-- Replaced manual JSON parsing with Gson for robust serialization/deserialization.
-- Added `pom.xml` so dependencies are managed by Maven.
-- Improved IO error handling and deduplicated search results.
-
-## CI fix
-The GitHub Actions workflow was updated to build using Maven (Java 21) and run `mvn -Pcustom-src test`. This fixes the previous workflow failure which used hard-coded paths that did not match the repository layout.
-
-## Recommendations
-- Use Maven locally to run builds/tests and to keep external jars out of the repository.
-- Add a `LICENSE` file if you plan to publish the code.
-
-## How to help / contribute
-- Open an issue or a pull request with suggested improvements.
-- If you want, I can convert this to Gradle instead of Maven; tell me which you prefer.
-
----
-If you'd like I can now tidy up the README's prose further and add a short demo section showing example commands and expected output. Which formatting and details would you like included? (e.g., short quick-start, code snippets, API summary)
+If you'd like more polish on the README (demo steps, example console outputs, screenshots), tell me which sections you'd like expanded and I will update the file accordingly.
