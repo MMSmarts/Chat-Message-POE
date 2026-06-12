@@ -17,8 +17,8 @@ Project layout
 --------------
 - `src/mainApp/` — application sources (Message, Login, Main)
 - `Test/testApp/` — JUnit tests
-- `pom.xml` — Maven POM (manages Gson and JUnit)
-- `.github/workflows/test.yml` — GitHub Actions workflow (runs `mvn test`)
+- `pom.xml` — Maven POM (manages Gson and JUnit, uses `custom-src` profile for non-standard layout)
+- `.github/workflows/build.yml` — GitHub Actions workflow (builds, tests, and packages with Maven)
 
 What changed recently
 ---------------------

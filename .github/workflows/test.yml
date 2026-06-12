@@ -20,8 +20,11 @@ jobs:
           distribution: 'temurin'
 
       - name: Build with Maven and run tests
-        run: |
-          mvn -Pcustom-src -B test
+        run: mvn -Pcustom-src -B clean test
         # The project contains a custom source layout; the `custom-src` profile
         # in pom.xml maps the source and test directories to the existing
         # NetBeans layout (src/mainApp and Test/testApp).
+
+      - name: Package artifact
+        run: mvn -Pcustom-src -B package -DskipTests
+
