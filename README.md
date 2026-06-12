@@ -72,15 +72,3 @@ An element in the array looks like:
   "flag": "Stored"
 }
 ```
-
-If CI fails
------------
-- Open the Actions page for the failing run and inspect the log. The updated workflow runs `mvn -Pcustom-src test` which should pass if `pom.xml` is present and correct.
-- Paste the failing log here if anything still fails and I will diagnose it immediately.
-
-Contributing and next steps
----------------------------
-- I can convert to Gradle if you prefer, or refactor the persistence layer into a separate class. Tell me which change you'd like next and I will implement and test it.
-- Add a `LICENSE` file before publishing if you want to pick a specific license.
-
-If you'd like more polish on the README (demo steps, example console outputs, screenshots), tell me which sections you'd like expanded and I will update the file accordingly.
