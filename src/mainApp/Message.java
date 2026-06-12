@@ -4,6 +4,10 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.List;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
 
 public class Message {
     private String messageID;
@@ -145,35 +149,24 @@ public class Message {
     }
 
     public void storeMessage() {
+        // Use Gson to persist a list of StoredMessage objects to JSON
         try {
-            ArrayList<String> existingMessages = loadStoredMessagesFromJSON();
+            ArrayList<StoredMessage> existingMessages = loadStoredMessagesFromJSON();
 
-            String jsonMessage = "{\n";
-            jsonMessage += "  \"messageID\": \"" + escapeJson(messageID) + "\",\n";
-            jsonMessage += "  \"messageHash\": \"" + escapeJson(messageHash) + "\",\n";
-            jsonMessage += "  \"sender\": \"" + escapeJson(sender) + "\",\n";
-            jsonMessage += "  \"recipient\": \"" + escapeJson(recipient) + "\",\n";
-            jsonMessage += "  \"messageText\": \"" + escapeJson(messageText) + "\",\n";
-            jsonMessage += "  \"flag\": \"" + escapeJson(flag) + "\"\n";
-            jsonMessage += "}";
+            StoredMessage sm = new StoredMessage();
+            sm.messageID = this.messageID;
+            sm.messageHash = this.messageHash;
+            sm.sender = this.sender;
+            sm.recipient = this.recipient;
+            sm.messageText = this.messageText;
+            sm.flag = this.flag;
 
-            existingMessages.add(jsonMessage);
+            existingMessages.add(sm);
 
-            FileWriter writer = new FileWriter("storedMessages.json");
-            writer.write("[\n");
-
-            for (int i = 0; i < existingMessages.size(); i++) {
-                writer.write(existingMessages.get(i));
-
-                if (i < existingMessages.size() - 1) {
-                    writer.write(",\n");
-                } else {
-                    writer.write("\n");
-                }
+            Gson gson = new Gson();
+            try (FileWriter writer = new FileWriter("storedMessages.json")) {
+                gson.toJson(existingMessages, writer);
             }
-
-            writer.write("]");
-            writer.close();
 
         } catch (IOException e) {
             System.out.println("Error storing message: " + e.getMessage());
@@ -192,71 +185,44 @@ public class Message {
                 .replace("\t", "\\t");
     }
 
-    public static ArrayList<String> loadStoredMessagesFromJSON() {
-        ArrayList<String> messages = new ArrayList<>();
+    public static ArrayList<StoredMessage> loadStoredMessagesFromJSON() throws IOException {
         File file = new File("storedMessages.json");
 
         if (!file.exists()) {
-            return messages;
+            return new ArrayList<>();
         }
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            StringBuilder content = new StringBuilder();
-            String line;
-
-            while ((line = reader.readLine()) != null) {
-                content.append(line);
-            }
-
-            String jsonContent = content.toString();
-            int braceCount = 0;
-            int start = -1;
-
-            for (int i = 0; i < jsonContent.length(); i++) {
-                char c = jsonContent.charAt(i);
-
-                if (c == '{') {
-                    if (braceCount == 0) {
-                        start = i;
-                    }
-                    braceCount++;
-                } else if (c == '}') {
-                    braceCount--;
-
-                    if (braceCount == 0 && start != -1) {
-                        String message = jsonContent.substring(start, i + 1);
-                        messages.add(message);
-                    }
-                }
-            }
-
-        } catch (IOException e) {
-            System.out.println("Error loading messages: " + e.getMessage());
+        try (Reader reader = new FileReader(file)) {
+            Gson gson = new Gson();
+            Type listType = new TypeToken<ArrayList<StoredMessage>>(){}.getType();
+            ArrayList<StoredMessage> messages = gson.fromJson(reader, listType);
+            return messages != null ? messages : new ArrayList<>();
         }
-
-        return messages;
     }
 
     // Load stored messages from JSON into the storedMessagesArray
     public static void loadStoredMessagesIntoArray() {
-        ArrayList<String> jsonMessages = loadStoredMessagesFromJSON();
-        
-        for (String jsonMsg : jsonMessages) {
-            StoredMessage sm = parseJSONToStoredMessage(jsonMsg);
-            Message msg = new Message(sm.messageID, 0, sm.recipient, sm.sender, sm.messageText);
-            msg.messageHash = sm.messageHash;
-            msg.flag = sm.flag;
-            storedMessagesArray.add(msg);
-            messageHashesArray.add(sm.messageHash);
-            messageIDsArray.add(sm.messageID);
-            
-            if (sm.flag.equals("Stored")) {
-                totalMessagesStored++;
-            } else if (sm.flag.equals("Sent")) {
-                totalMessagesSent++;
-            } else if (sm.flag.equals("Disregarded")) {
-                totalMessagesDisregarded++;
+        try {
+            ArrayList<StoredMessage> jsonMessages = loadStoredMessagesFromJSON();
+
+            for (StoredMessage sm : jsonMessages) {
+                Message msg = new Message(sm.messageID, 0, sm.recipient, sm.sender, sm.messageText);
+                msg.messageHash = sm.messageHash;
+                msg.flag = sm.flag;
+                storedMessagesArray.add(msg);
+                messageHashesArray.add(sm.messageHash);
+                messageIDsArray.add(sm.messageID);
+
+                if (sm.flag.equals("Stored")) {
+                    totalMessagesStored++;
+                } else if (sm.flag.equals("Sent")) {
+                    totalMessagesSent++;
+                } else if (sm.flag.equals("Disregarded")) {
+                    totalMessagesDisregarded++;
+                }
             }
+        } catch (IOException e) {
+            System.out.println("Error loading messages into array: " + e.getMessage());
         }
     }
 
@@ -363,26 +329,32 @@ public class Message {
             }
         }
 
-        ArrayList<String> jsonMessages = loadStoredMessagesFromJSON();
+        try {
+            ArrayList<StoredMessage> jsonMessages = loadStoredMessagesFromJSON();
 
-        for (String jsonMsg : jsonMessages) {
-            StoredMessage msg = parseJSONToStoredMessage(jsonMsg);
-            if (msg.flag.equals("Stored")) {
-                System.out.println("Sender: " + msg.sender + " | Recipient: " + msg.recipient);
+            for (StoredMessage msg : jsonMessages) {
+                if (msg.flag.equals("Stored")) {
+                    System.out.println("Sender: " + msg.sender + " | Recipient: " + msg.recipient);
+                }
             }
+        } catch (IOException e) {
+            System.out.println("Error loading stored messages: " + e.getMessage());
         }
     }
 
     public static String getLongestStoredMessage() {
-        ArrayList<String> jsonMessages = loadStoredMessagesFromJSON();
         String longestMessage = "";
 
-        for (String jsonMsg : jsonMessages) {
-            StoredMessage msg = parseJSONToStoredMessage(jsonMsg);
+        try {
+            ArrayList<StoredMessage> jsonMessages = loadStoredMessagesFromJSON();
 
-            if (msg.flag.equals("Stored") && msg.messageText.length() > longestMessage.length()) {
-                longestMessage = msg.messageText;
+            for (StoredMessage msg : jsonMessages) {
+                if (msg.flag.equals("Stored") && msg.messageText.length() > longestMessage.length()) {
+                    longestMessage = msg.messageText;
+                }
             }
+        } catch (IOException e) {
+            System.out.println("Error reading stored messages: " + e.getMessage());
         }
 
         for (Message msg : storedMessagesArray) {
@@ -395,14 +367,16 @@ public class Message {
     }
 
     public static String searchByMessageID(String messageID) {
-        ArrayList<String> jsonMessages = loadStoredMessagesFromJSON();
+        try {
+            ArrayList<StoredMessage> jsonMessages = loadStoredMessagesFromJSON();
 
-        for (String jsonMsg : jsonMessages) {
-            StoredMessage msg = parseJSONToStoredMessage(jsonMsg);
-
-            if (msg.messageID.equals(messageID)) {
-                return "Recipient: " + msg.recipient + "\nMessage: " + msg.messageText;
+            for (StoredMessage msg : jsonMessages) {
+                if (msg.messageID.equals(messageID)) {
+                    return "Recipient: " + msg.recipient + "\nMessage: " + msg.messageText;
+                }
             }
+        } catch (IOException e) {
+            System.out.println("Error reading stored messages: " + e.getMessage());
         }
 
         for (Message msg : storedMessagesArray) {
@@ -417,14 +391,16 @@ public class Message {
     public static ArrayList<String> searchByRecipient(String recipientNumber) {
         // Use LinkedHashSet to preserve insertion order and remove duplicates
         Set<String> resultsSet = new LinkedHashSet<>();
-        ArrayList<String> jsonMessages = loadStoredMessagesFromJSON();
+        try {
+            ArrayList<StoredMessage> jsonMessages = loadStoredMessagesFromJSON();
 
-        for (String jsonMsg : jsonMessages) {
-            StoredMessage msg = parseJSONToStoredMessage(jsonMsg);
-
-            if (msg.recipient.equals(recipientNumber)) {
-                resultsSet.add(msg.messageText);
+            for (StoredMessage msg : jsonMessages) {
+                if (msg.recipient.equals(recipientNumber)) {
+                    resultsSet.add(msg.messageText);
+                }
             }
+        } catch (IOException e) {
+            System.out.println("Error reading stored messages: " + e.getMessage());
         }
 
         for (Message msg : storedMessagesArray) {
@@ -437,60 +413,44 @@ public class Message {
     }
 
     public static String deleteByMessageHash(String messageHash) {
-        ArrayList<String> jsonMessages = loadStoredMessagesFromJSON();
         boolean deleted = false;
-        ArrayList<String> updatedMessages = new ArrayList<>();
-
-        for (String jsonMsg : jsonMessages) {
-            StoredMessage msg = parseJSONToStoredMessage(jsonMsg);
-
-            if (msg.messageHash.equals(messageHash)) {
-                deleted = true;
-                for (int i = 0; i < storedMessagesArray.size(); i++) {
-                    if (storedMessagesArray.get(i).messageHash.equals(messageHash)) {
-                        storedMessagesArray.remove(i);
-                        break;
-                    }
-                }
-            } else {
-                updatedMessages.add(jsonMsg);
-            }
-        }
 
         try {
-            FileWriter writer = new FileWriter("storedMessages.json");
-            writer.write("[\n");
+            ArrayList<StoredMessage> jsonMessages = loadStoredMessagesFromJSON();
+            ArrayList<StoredMessage> updatedMessages = new ArrayList<>();
 
-            for (int i = 0; i < updatedMessages.size(); i++) {
-                writer.write(updatedMessages.get(i));
-
-                if (i < updatedMessages.size() - 1) {
-                    writer.write(",\n");
+            for (StoredMessage msg : jsonMessages) {
+                if (msg.messageHash.equals(messageHash)) {
+                    deleted = true;
                 } else {
-                    writer.write("\n");
+                    updatedMessages.add(msg);
                 }
             }
 
-            writer.write("]");
-            writer.close();
+            // Write updated list back to file
+            Gson gson = new Gson();
+            try (FileWriter writer = new FileWriter("storedMessages.json")) {
+                gson.toJson(updatedMessages, writer);
+            }
+
+            // Remove from in-memory arrays
+            for (int i = 0; i < storedMessagesArray.size(); i++) {
+                if (storedMessagesArray.get(i).messageHash.equals(messageHash)) {
+                    storedMessagesArray.remove(i);
+                    deleted = true;
+                    break;
+                }
+            }
+
+            for (int i = 0; i < messageHashesArray.size(); i++) {
+                if (messageHashesArray.get(i).equals(messageHash)) {
+                    messageHashesArray.remove(i);
+                    break;
+                }
+            }
 
         } catch (IOException e) {
             return "Error saving after deletion.";
-        }
-
-        for (int i = 0; i < storedMessagesArray.size(); i++) {
-            if (storedMessagesArray.get(i).messageHash.equals(messageHash)) {
-                storedMessagesArray.remove(i);
-                deleted = true;
-                break;
-            }
-        }
-
-        for (int i = 0; i < messageHashesArray.size(); i++) {
-            if (messageHashesArray.get(i).equals(messageHash)) {
-                messageHashesArray.remove(i);
-                break;
-            }
         }
 
         return deleted ? "Message successfully deleted." : "Message hash not found.";
@@ -500,32 +460,35 @@ public class Message {
         System.out.println("\n===== FULL STORED MESSAGES REPORT =====");
         System.out.println("\n--- All Stored Messages ---");
 
-        ArrayList<String> jsonMessages = loadStoredMessagesFromJSON();
+        try {
+            ArrayList<StoredMessage> jsonMessages = loadStoredMessagesFromJSON();
 
-        if (jsonMessages.isEmpty() && storedMessagesArray.isEmpty()) {
-            System.out.println("No stored messages found.");
-            return;
-        }
-
-        int reportCount = 0;
-        
-        for (String jsonMsg : jsonMessages) {
-            StoredMessage msg = parseJSONToStoredMessage(jsonMsg);
-            if (msg.flag.equals("Stored")) {
-                System.out.println("\n--- Message " + (++reportCount) + " ---");
-                System.out.println("Message Hash: " + msg.messageHash);
-                System.out.println("Recipient: " + msg.recipient);
-                System.out.println("Message: " + msg.messageText);
+            if (jsonMessages.isEmpty() && storedMessagesArray.isEmpty()) {
+                System.out.println("No stored messages found.");
+                return;
             }
-        }
 
-        for (Message msg : storedMessagesArray) {
-            if (msg.flag.equals("Stored")) {
-                System.out.println("\n--- Message " + (++reportCount) + " ---");
-                System.out.println("Message Hash: " + msg.messageHash);
-                System.out.println("Recipient: " + msg.recipient);
-                System.out.println("Message: " + msg.messageText);
+            int reportCount = 0;
+
+            for (StoredMessage msg : jsonMessages) {
+                if (msg.flag.equals("Stored")) {
+                    System.out.println("\n--- Message " + (++reportCount) + " ---");
+                    System.out.println("Message Hash: " + msg.messageHash);
+                    System.out.println("Recipient: " + msg.recipient);
+                    System.out.println("Message: " + msg.messageText);
+                }
             }
+
+            for (Message msg : storedMessagesArray) {
+                if (msg.flag.equals("Stored")) {
+                    System.out.println("\n--- Message " + (++reportCount) + " ---");
+                    System.out.println("Message Hash: " + msg.messageHash);
+                    System.out.println("Recipient: " + msg.recipient);
+                    System.out.println("Message: " + msg.messageText);
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Error loading stored messages: " + e.getMessage());
         }
     }
 
@@ -557,9 +520,10 @@ public class Message {
     
     public static void clearJSONFile() {
         try {
-            FileWriter writer = new FileWriter("storedMessages.json");
-            writer.write("[]");
-            writer.close();
+            Gson gson = new Gson();
+            try (FileWriter writer = new FileWriter("storedMessages.json")) {
+                gson.toJson(new ArrayList<StoredMessage>(), writer);
+            }
         } catch (IOException e) {
             System.out.println("Error clearing JSON file: " + e.getMessage());
         }
