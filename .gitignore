@@ -1,0 +1,25 @@
+# Build artifacts
+/build/
+/dist/
+
+# NetBeans private project settings
+/nbproject/private/
+
+# Compiled classes
+*.class
+
+# Local jars and libraries
+/lib/*.jar
+
+# Stored runtime data
+/storedMessages.json
+
+# IDE files
+*.iml
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
